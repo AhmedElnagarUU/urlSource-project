@@ -4,6 +4,9 @@ import { scrapeNewsFromUrl } from "@/modules/scraping/utils/scrapeUrl";
 import { NewsBySource } from "@/modules/news/types";
 
 const DEFAULT_CONCURRENCY = 3;
+type NewsSourceRecord = Awaited<
+  ReturnType<typeof prisma.newsSource.findMany>
+>[number];
 
 // POST - Fetch news from all saved sources
 export async function POST() {
@@ -15,35 +18,35 @@ export async function POST() {
       },
     });
 
-    if (sources.length === 0) {
-      return NextResponse.json({
-        success: true,
-        newsBySource: [],
-        message: "No news sources found. Please add some sources first.",
-      });
-    }
-    const concurrencyLimit = getConcurrencyLimit();
-    const failedSources: FailedSource[] = [];
-
-    const newsBySource = await processInBatches(
-      sources,
-      concurrencyLimit,
-      async (source) => {
-        try {
-          const news = await scrapeNewsFromUrl(source.url);
-          return buildNewsBySource(source, news);
-        } catch (error: any) {
-          const reason = error?.message || "Unknown error while scraping";
-          console.error(`Error fetching news from ${source.url}:`, error);
-          failedSources.push({
-            id: source.id,
-            url: source.url,
-            reason,
-          });
-          return buildNewsBySource(source, []);
-        }
+      if (sources.length === 0) {
+        return NextResponse.json({
+          success: true,
+          newsBySource: [],
+          message: "No news sources found. Please add some sources first.",
+        });
       }
-    );
+      const concurrencyLimit = getConcurrencyLimit();
+      const failedSources: FailedSource[] = [];
+
+      const newsBySource = await processInBatches<NewsSourceRecord, NewsBySource>(
+        sources,
+        concurrencyLimit,
+        async (source) => {
+          try {
+            const news = await scrapeNewsFromUrl(source.url);
+            return buildNewsBySource(source, news);
+          } catch (error: any) {
+            const reason = error?.message || "Unknown error while scraping";
+            console.error(`Error fetching news from ${source.url}:`, error);
+            failedSources.push({
+              id: source.id,
+              url: source.url,
+              reason,
+            });
+            return buildNewsBySource(source, []);
+          }
+        }
+      );
 
     return NextResponse.json({
       success: true,
