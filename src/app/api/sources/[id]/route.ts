@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 // DELETE - Remove a news source
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(

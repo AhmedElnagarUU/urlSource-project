@@ -1,14 +1,18 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
 import { NewsArticle } from "@/modules/scraping/types";
 
 const MODEL_NAME = "gemini-2.5-flash";
-const ai = new GoogleGenAI({ apiKey: "AIzaSyCXjsWGpWobPhk_W8zSIkTKjyk8hlPh0oE" });
-const model = ai.getGenerativeModel({ model: MODEL_NAME });
+const ai = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_API_KEY ?? "",
+});
 
 export async function giminai(source: string, baseUrl: string): Promise<NewsArticle[]> {
   try {
     const prompt = buildPrompt(source, baseUrl);
-    const response = await model.generateContent(prompt);
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+    });
     const responseText = extractText(response);
 
     if (!responseText) {
@@ -63,43 +67,12 @@ HTML Content:
 ${source.substring(0, 50000)}`;
 }
 
-function extractText(response: unknown): string {
+function extractText(response?: GenerateContentResponse): string {
   if (!response) {
     return "";
   }
 
-  const result = response as {
-    response?: {
-      text?: () => string;
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{ text?: string }>;
-        };
-      }>;
-    };
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
-
-  if (typeof result.response?.text === "function") {
-    const text = result.response.text();
-    if (text) return text;
-  }
-
-  const candidates = result.response?.candidates || result.candidates;
-  if (candidates?.length) {
-    return candidates
-      .map((candidate) =>
-        candidate.content?.parts?.map((part) => part.text ?? "").join("")
-      )
-      .join("")
-      .trim();
-  }
-
-  return "";
+  return response.text?.trim() ?? "";
 }
 
 function sanitizeToJsonArray(rawText: string) {
