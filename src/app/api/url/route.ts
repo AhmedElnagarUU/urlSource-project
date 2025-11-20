@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as cheerio from "cheerio";
-import { giminai } from "@/aiAgent/giminai"
+import { giminai } from "@/aiAgent/giminai";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
           success: false,
           error: "URL is required" 
         },
-        { status: 200 } // Return 200 but with error in body
+        { status: 400 }
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
           success: false,
           error: `Failed to fetch URL: ${response.status} ${response.statusText}. The website may require authentication or block automated requests.` 
         },
-        { status: 200 } // Return 200 but with error in body
+        { status: 502 }
       );
     }
 
@@ -51,9 +51,6 @@ export async function POST(req: NextRequest) {
     $('header').remove();
     $('noscript').remove();
     $('iframe').remove();
-    
-    // Extract body content
-    const bodyContent = $('body').html() || html;
     
     // Get clean text content from body (limit to reasonable size for AI)
     const bodyText = $('body').text()
@@ -153,7 +150,7 @@ export async function POST(req: NextRequest) {
         success: false,
         error: error.message || "Failed to scrape the webpage",
       },
-      { status: 200 } // Return 200 but with error in body
+      { status: 500 }
     );
   }
 }
