@@ -7,14 +7,14 @@ interface NewsCardProps {
 
 export default function NewsCard({ item }: NewsCardProps) {
   return (
-    <Card>
+    <Card className="cursor-pointer">
       {/* Image */}
       {item.image && (
-        <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
+        <div className="relative w-full h-56 bg-gradient-to-br from-[#0f172a] to-[#1e293b] overflow-hidden rounded-t-lg">
           <img
             src={item.image}
             alt={item.imageAlt || item.title}
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
@@ -23,11 +23,11 @@ export default function NewsCard({ item }: NewsCardProps) {
       )}
       
       {/* Content */}
-      <div className="p-5 grow flex flex-col">
-        <h4 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2">
+      <div className="p-6 grow flex flex-col">
+        <h4 className="text-xl font-bold text-white mb-3 line-clamp-2">
           {item.title}
         </h4>
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3 grow">
+        <p className="text-gray-300 text-sm mb-4 line-clamp-3 grow leading-relaxed">
           {item.description}
         </p>
         
@@ -37,11 +37,12 @@ export default function NewsCard({ item }: NewsCardProps) {
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-semibold text-sm transition-colors"
+            className="inline-flex items-center text-[#14b8a6] font-semibold text-sm gap-1 mt-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            {item.linkText}
+            <span>{item.linkText || "Read more"}</span>
             <svg
-              className="w-4 h-4 ml-1"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

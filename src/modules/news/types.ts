@@ -14,5 +14,7 @@ export interface NewsBySource {
     name: string | null;
   };
   news: NewsItem[];
+  success?: boolean;
+  error?: string;
 }
 

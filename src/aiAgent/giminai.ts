@@ -1,5 +1,6 @@
 import { GoogleGenAI, type GenerateContentResponse } from "@google/genai";
 import { NewsArticle } from "@/modules/scraping/types";
+import logger from "@/lib/logger/logger";
 
 const MODEL_NAME = "gemini-2.5-flash";
 const ai = new GoogleGenAI({
@@ -7,23 +8,54 @@ const ai = new GoogleGenAI({
 });
 
 export async function giminai(source: string, baseUrl: string): Promise<NewsArticle[]> {
+  const startTime = Date.now();
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
+    await logger.info("AI processing started", {
+      requestId,
+      url: baseUrl,
+      inputSize: source.length,
+      model: MODEL_NAME,
+    });
+
     const prompt = buildPrompt(source, baseUrl);
+    
+    await logger.debug("AI prompt generated", {
+      requestId,
+      promptLength: prompt.length,
+      promptPreview: prompt.substring(0, 200),
+    });
+
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
     });
+    
     const responseText = extractText(response);
+    const processingTime = Date.now() - startTime;
 
     if (!responseText) {
-      console.error("Gemini returned an empty response.");
-      return [];
+      const error = new Error("AI returned empty response");
+      await logger.error("AI returned empty response", error, {
+        requestId,
+        url: baseUrl,
+        processingTime,
+      });
+      throw error;
     }
+
+    await logger.debug("AI response received", {
+      requestId,
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 500),
+      processingTime,
+    });
 
     const jsonText = sanitizeToJsonArray(responseText);
     const newsArticles: NewsArticle[] = JSON.parse(jsonText);
 
-    return newsArticles
+    const cleanedArticles = newsArticles
       .filter((article) => article && article.title)
       .map((article) => ({
         title: article.title.trim(),
@@ -32,9 +64,28 @@ export async function giminai(source: string, baseUrl: string): Promise<NewsArti
         description: article.description ? article.description.trim() : "",
       }))
       .slice(0, 12);
+
+    await logger.info("AI processing completed", {
+      requestId,
+      url: baseUrl,
+      articlesExtracted: cleanedArticles.length,
+      processingTime,
+    });
+
+    return cleanedArticles;
   } catch (error: any) {
-    console.error("Error in giminai:", error);
-    return [];
+    const processingTime = Date.now() - startTime;
+    await logger.error("AI processing failed", error, {
+      requestId,
+      url: baseUrl,
+      inputSize: source.length,
+      processingTime,
+      errorType: error.constructor?.name || "Unknown",
+      errorMessage: error.message || "Unknown error",
+      errorCode: error.code || error.status || "N/A",
+    });
+    // Re-throw error so it can be properly handled by the caller
+    throw error;
   }
 }
 

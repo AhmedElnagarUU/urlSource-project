@@ -1,12 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
+import axios from "@/lib/axios";
 import { NewsSource } from "@/modules/sources/types";
 import { NewsBySource as NewsBySourceType } from "@/modules/news/types";
 import AddSourceForm from "@/modules/sources/components/AddSourceForm";
 import SourceList from "@/modules/sources/components/SourceList";
 import RefreshButton from "@/modules/news/components/RefreshButton";
 import NewsBySource from "@/modules/news/components/NewsBySource";
+import HeroSection from "@/modules/news/components/HeroSection";
 import ErrorDisplay from "@/shared/components/ErrorDisplay";
+
+// Client-side logger wrapper
+const logUserAction = (action: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[User Action] ${action}`, data);
+  }
+};
 
 export default function Home() {
   const [sources, setSources] = useState<NewsSource[]>([]);
@@ -14,6 +23,7 @@ export default function Home() {
   const [loadingSources, setLoadingSources] = useState(true);
   const [loadingNews, setLoadingNews] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Load sources on mount
   useEffect(() => {
@@ -22,15 +32,14 @@ export default function Home() {
 
   const loadSources = async () => {
     try {
-      const response = await fetch("/api/sources");
-      const result = await response.json();
-      if (result.success) {
-        setSources(result.sources);
+      const response = await axios.get("/api/sources");
+      if (response.data.success) {
+        setSources(response.data.sources);
       } else {
-        setError(result.error || "Failed to load sources");
+        setError(response.data.error || "Failed to load sources");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || "An unexpected error occurred");
     } finally {
       setLoadingSources(false);
     }
@@ -41,76 +50,105 @@ export default function Home() {
     setError(null);
     setNewsBySource([]);
 
+    logUserAction("Refresh news initiated", { sourceCount: sources.length });
+
     try {
-      const response = await fetch("/api/news/refresh", {
-        method: "POST",
-      });
+      const response = await axios.post("/api/news/refresh");
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        }));
-        setError(errorData.error || `Server error: ${response.status}`);
-        return;
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        setNewsBySource(result.newsBySource);
-        if (result.message) {
+      if (response.data.success) {
+        const totalArticles = response.data.newsBySource?.reduce(
+          (sum: number, group: NewsBySourceType) => sum + group.news.length, 
+          0
+        ) || 0;
+        
+        logUserAction("News refreshed successfully", { 
+          totalArticles,
+          sourceCount: response.data.meta?.totalSources || 0,
+        });
+        
+        setNewsBySource(response.data.newsBySource);
+        setLastRefresh(new Date());
+        if (response.data.message) {
           // Show info message if no sources
-          console.log(result.message);
+          console.log(response.data.message);
         }
       } else {
-        setError(result.error || "Failed to refresh news");
+        setError(response.data.error || "Failed to refresh news");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+    } catch (err: any) {
+      logUserAction("Refresh news failed", { 
+        error: err.response?.data?.error || err.message 
+      });
+      setError(err.response?.data?.error || err.message || "An unexpected error occurred");
     } finally {
       setLoadingNews(false);
     }
   };
 
+  const totalArticles = newsBySource.reduce((sum, group) => sum + group.news.length, 0);
+
   return (
-    <div className="min-h-screen bg-gradient-to-tr from-blue-100 to-indigo-200 py-8 px-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-indigo-600 mb-2">News Aggregator</h1>
-          <p className="text-gray-600">
-            Add multiple news sources and view all your news in one place
-          </p>
+    <div className="min-h-screen bg-[#0f172a]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        {/* Hero Section with Stats */}
+        <HeroSection
+          totalSources={sources.length}
+          totalArticles={totalArticles}
+          lastRefresh={lastRefresh}
+        />
+
+        {/* Add Source Form */}
+        <div className="mb-8">
+          <AddSourceForm onSourceAdded={loadSources} />
         </div>
 
-        <AddSourceForm onSourceAdded={loadSources} />
-
+        {/* Sources List */}
         {loadingSources ? (
-          <div className="bg-white shadow-xl rounded-lg p-6 border border-blue-200 text-center">
-            <p className="text-gray-600">Loading sources...</p>
+          <div className="bg-[#1e293b]/80 backdrop-blur-lg shadow-lg rounded-2xl p-12 border border-[#334155]/50 text-center mb-8">
+            <div className="h-4 bg-[#334155]/50 rounded w-1/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-[#334155]/50 rounded w-1/2 mx-auto"></div>
           </div>
         ) : (
-          <SourceList sources={sources} onSourceDeleted={loadSources} />
+          <div className="mb-8">
+            <SourceList sources={sources} onSourceDeleted={loadSources} />
+          </div>
         )}
 
+        {/* Refresh Button */}
         {sources.length > 0 && (
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-8">
             <RefreshButton onRefresh={handleRefresh} loading={loadingNews} />
           </div>
         )}
 
+        {/* Error Display */}
         <ErrorDisplay error={error} />
 
+        {/* News Display */}
         {newsBySource.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-12">
+            <div className="mb-6">
+              <h2 className="text-3xl font-bold text-white mb-2">Latest News</h2>
+              <p className="text-gray-300">Articles from your saved sources</p>
+            </div>
             <NewsBySource newsBySource={newsBySource} />
           </div>
         )}
 
+        {/* Empty State */}
         {!loadingNews && newsBySource.length === 0 && sources.length > 0 && (
-          <div className="bg-white shadow-xl rounded-lg p-8 border border-blue-200 text-center">
-            <p className="text-gray-600">
-              Click "Refresh All News" above to fetch the latest articles from your saved sources.
-            </p>
+          <div className="bg-[#1e293b]/80 backdrop-blur-lg shadow-lg rounded-2xl p-12 border border-[#334155]/50 text-center">
+            <div className="max-w-md mx-auto">
+              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <p className="text-gray-300 text-lg mb-2">
+                Ready to fetch the latest news?
+              </p>
+              <p className="text-gray-400">
+                Click "Refresh All News" above to fetch the latest articles from your saved sources.
+              </p>
+            </div>
           </div>
         )}
       </div>

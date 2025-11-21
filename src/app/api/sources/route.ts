@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import logger from "@/lib/logger/logger";
 
 // GET all news sources
 export async function GET() {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
+    await logger.info("Fetching sources", {
+      requestId,
+      endpoint: "/api/sources",
+      method: "GET",
+    });
+
     const sources = await prisma.newsSource.findMany({
       orderBy: {
         createdAt: 'desc',
       },
     });
+
+    await logger.info("Sources fetched successfully", {
+      requestId,
+      sourceCount: sources.length,
+    });
+
     return NextResponse.json({ success: true, sources });
   } catch (error: any) {
-    console.error("Error fetching sources:", error);
+    await logger.error("Failed to fetch sources", error, {
+      requestId,
+      endpoint: "/api/sources",
+    });
     return NextResponse.json(
       {
         success: false,
@@ -24,11 +42,24 @@ export async function GET() {
 
 // POST - Add a new news source
 export async function POST(req: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     const body = await req.json();
     const { url, name } = body;
 
+    await logger.info("Adding news source", {
+      requestId,
+      endpoint: "/api/sources",
+      method: "POST",
+      url: url?.substring(0, 100), // Log partial URL for privacy
+      hasName: !!name,
+    });
+
     if (!url || typeof url !== "string") {
+      await logger.warn("Invalid request: URL missing", {
+        requestId,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -50,6 +81,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (existing) {
+      await logger.warn("Source already exists", {
+        requestId,
+        url: normalizedUrl.substring(0, 100),
+      });
       return NextResponse.json(
         {
           success: false,
@@ -66,9 +101,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await logger.info("Source added successfully", {
+      requestId,
+      sourceId: source.id,
+      url: normalizedUrl.substring(0, 100),
+    });
+
     return NextResponse.json({ success: true, source });
   } catch (error: any) {
-    console.error("Error creating source:", error);
+    await logger.error("Failed to create source", error, {
+      requestId,
+      endpoint: "/api/sources",
+    });
     return NextResponse.json(
       {
         success: false,

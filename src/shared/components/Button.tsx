@@ -14,12 +14,12 @@ export default function Button({
   className = "",
   ...props
 }: ButtonProps) {
-  const baseClasses = "px-6 py-3 font-semibold rounded-md transition shadow-lg flex items-center justify-center gap-2";
+  const baseClasses = "px-6 py-3 font-semibold rounded-lg shadow-lg flex items-center justify-center gap-2 backdrop-blur-md border";
   
   const variantClasses = {
-    primary: "bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white",
-    secondary: "bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white",
-    danger: "bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white",
+    primary: "bg-[#14b8a6]/80 border-[#14b8a6]/50 disabled:bg-[#0f766e]/50 disabled:border-[#0f766e]/30 text-white",
+    secondary: "bg-[#334155]/80 border-[#334155]/50 disabled:bg-[#1e293b]/50 disabled:border-[#1e293b]/30 text-white",
+    danger: "bg-red-600/80 border-red-600/50 disabled:bg-red-400/50 disabled:border-red-400/30 text-white",
   };
 
   return (
